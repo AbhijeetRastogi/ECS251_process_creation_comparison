@@ -1,0 +1,56 @@
+BENCHMARK VISUALIZATION SUMMARY
+============================================================
+Generated : 2026-02-19 04:33:56
+Source CSV: /home/friend1/ECS251_process_creation_comparison/results_20260219_043247/results.csv
+Output dir: /home/friend1/ECS251_process_creation_comparison/graphs_20260219_043351
+eBPF data : Yes
+
+GRAPHS GENERATED
+----------------------------------------
+  01_mean_latency.png
+    Mean latency grouped bar chart. Headline comparison
+    of all three methods.
+
+  02_latency_distribution.png
+    Distribution plot showing mean, std dev, P99, min,
+    and max for each configuration.
+
+  03_hugepage_speedup.png
+    Speedup ratio chart showing how much faster 2MB huge
+    pages are vs 4KB regular pages.
+
+  04_memory_scaling.png
+    Line chart showing how latency grows as parent
+    memory doubles. fork scales linearly;
+    vfork/posix_spawn stay flat.
+
+  05_page_faults.png
+    (eBPF) Kernel and user page faults per iteration.
+    Quantifies the CoW copy work triggered by fork.
+
+  06_tlb_breakdown.png
+    (eBPF) TLB flush events broken down by type. Remote
+    shootdowns are the key multi-core cost of fork.
+
+  07_correlation_heatmap.png
+    (eBPF) Correlation matrix between latency and kernel
+    events. Shows which events most strongly predict
+    latency.
+
+  08_summary_table.png
+    Full results in table form. All configurations side
+    by side — useful for reports or slides.
+
+KEY FINDINGS (from data)
+----------------------------------------
+  - fork() is 19× slower than vfork() at 1 GB with 4KB pages.
+  - Huge pages reduce fork() latency by 0.9× on average.
+
+HOW TO READ THE GRAPHS
+----------------------------------------
+  Red   = fork()
+  Blue  = vfork()
+  Green = posix_spawn()
+
+  Error bars / shaded bands = ±1 standard deviation
+  P99 = worst time experienced by 1% of iterations

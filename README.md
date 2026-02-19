@@ -86,6 +86,46 @@ Configure system for optimal benchmarking:
 make setup
 ```
 
+Install dependencies (can keep all checkboxes unchecked):
+```bash
+sudo apt install clang libbpf-dev libelf-dev linux-headers-$(uname -r) linux-tools-common linux-tools-generic linux-tools-$(uname -r)
+```
+
+Mount debugfs if running on AWS:
+```bash
+sudo mount -t debugfs debugfs /sys/kernel/debug
+```
+
+Add this permanently:
+```bash
+echo "debugfs /sys/kernel/debug debugfs defaults 0 0" | sudo tee -a /etc/fstab
+```
+Sometimes libbpf is shown as missing, fix the metadata:
+```bash
+sudo apt install pkg-config
+sudo ldconfig
+```
+or re-install:
+```bash
+sudo apt install libbpf-dev
+```
+
+Check eBPF is available on your system
+```bash
+sudo make check-ebpf
+```
+
+### Run Full Benchmark
+
+Build all:
+```bash
+make
+```
+Run the benchmark:
+```bash
+sudo ./benchmark
+```
+
 This will:
 - Enable transparent huge pages
 - Disable swap (prevents interference)
@@ -117,16 +157,6 @@ Expected output:
 - THP configuration status
 - Timer resolution confirmation (~1 nanosecond)
 
-### Run Full Benchmark
-```bash
-make run
-```
-
-Or manually:
-```bash
-./benchmark
-```
-
 The benchmark will:
 1. Test each memory size (1GB, 2GB)
 2. Test both page types (4KB regular, 2MB huge)
@@ -144,6 +174,22 @@ Memory_GB,Page_Size,Method,Mean_ms,StdDev_ms,P99_ms,Min_ms,Max_ms
 1,4KB,fork,12.345,1.234,15.678,10.123,18.901
 1,4KB,vfork,0.123,0.012,0.156,0.098,0.189
 ...
+```
+### View Visualizations
+
+Install python dependencies:
+```bash
+pip install matplotlib pandas numpy seaborn
+```
+
+Run the benchmark:
+```bash
+sudo ./benchmark
+```
+
+Generate visualizations:
+```bash
+python3 visualize_results.py results_[TIMESTAMP]/results.csv
 ```
 
 ## Configuration

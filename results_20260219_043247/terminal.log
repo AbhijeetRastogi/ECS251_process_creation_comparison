@@ -1,0 +1,121 @@
+Process Creation Benchmark with eBPF Kernel Tracing
+=====================================================
+Output directory : results_20260219_043247/
+Log file         : results_20260219_043247/terminal.log
+CSV file         : results_20260219_043247/results.csv
+Iterations per configuration: 100
+
+=== Testing fork | 1 GB | 4KB regular pages ===
+  Allocated and touched 1024 MB (4KB regular pages)
+  Running 100 iterations...
+  Latency    | Mean:    0.547 ms  StdDev:    0.078 ms  P99:    0.792 ms
+  PageFaults | User:    8.0  Kernel:    0.9  Total:    8.8
+  TLB Flush  | Total:    8.2  RemoteShootdown:    0.0  LocalShootdown:    0.0
+             | LocalMM:    7.2  RemoteIPI:    0.0  TaskSwitch:    1.0
+
+=== Testing vfork | 1 GB | 4KB regular pages ===
+  Allocated and touched 1024 MB (4KB regular pages)
+  Running 100 iterations...
+  Latency    | Mean:    0.029 ms  StdDev:    0.008 ms  P99:    0.086 ms
+  PageFaults | User:    0.0  Kernel:    0.0  Total:    0.0
+  TLB Flush  | Total:    0.0  RemoteShootdown:    0.0  LocalShootdown:    0.0
+             | LocalMM:    0.0  RemoteIPI:    0.0  TaskSwitch:    0.0
+
+=== Testing posix_spawn | 1 GB | 4KB regular pages ===
+  Allocated and touched 1024 MB (4KB regular pages)
+  Running 100 iterations...
+  Latency    | Mean:    0.130 ms  StdDev:    0.015 ms  P99:    0.234 ms
+  PageFaults | User:   49.0  Kernel:    2.8  Total:   51.9
+  TLB Flush  | Total:   14.7  RemoteShootdown:    0.0  LocalShootdown:    0.0
+             | LocalMM:   13.6  RemoteIPI:    0.1  TaskSwitch:    1.0
+
+=== Testing fork | 1 GB | 2MB huge pages ===
+  Allocated and touched 1024 MB (2MB huge pages)
+  Running 100 iterations...
+  Latency    | Mean:    0.603 ms  StdDev:    0.052 ms  P99:    0.787 ms
+  PageFaults | User:    8.0  Kernel:    0.9  Total:    8.8
+  TLB Flush  | Total:    8.2  RemoteShootdown:    0.0  LocalShootdown:    0.0
+             | LocalMM:    7.2  RemoteIPI:    0.0  TaskSwitch:    1.0
+
+=== Testing vfork | 1 GB | 2MB huge pages ===
+  Allocated and touched 1024 MB (2MB huge pages)
+  Running 100 iterations...
+  Latency    | Mean:    0.028 ms  StdDev:    0.006 ms  P99:    0.066 ms
+  PageFaults | User:    0.0  Kernel:    0.0  Total:    0.0
+  TLB Flush  | Total:    0.0  RemoteShootdown:    0.0  LocalShootdown:    0.0
+             | LocalMM:    0.0  RemoteIPI:    0.0  TaskSwitch:    0.0
+
+=== Testing posix_spawn | 1 GB | 2MB huge pages ===
+  Allocated and touched 1024 MB (2MB huge pages)
+  Running 100 iterations...
+  Latency    | Mean:    0.132 ms  StdDev:    0.020 ms  P99:    0.278 ms
+  PageFaults | User:   49.0  Kernel:    2.8  Total:   51.9
+  TLB Flush  | Total:   14.7  RemoteShootdown:    0.0  LocalShootdown:    0.0
+             | LocalMM:   13.6  RemoteIPI:    0.0  TaskSwitch:    1.0
+
+=== Testing fork | 2 GB | 4KB regular pages ===
+  Allocated and touched 2048 MB (4KB regular pages)
+  Running 100 iterations...
+  Latency    | Mean:    0.977 ms  StdDev:    0.123 ms  P99:    1.322 ms
+  PageFaults | User:    8.0  Kernel:    1.0  Total:    8.9
+  TLB Flush  | Total:    8.3  RemoteShootdown:    0.0  LocalShootdown:    0.0
+             | LocalMM:    7.3  RemoteIPI:    0.0  TaskSwitch:    1.0
+
+=== Testing vfork | 2 GB | 4KB regular pages ===
+  Allocated and touched 2048 MB (4KB regular pages)
+  Running 100 iterations...
+  Latency    | Mean:    0.028 ms  StdDev:    0.006 ms  P99:    0.077 ms
+  PageFaults | User:    0.0  Kernel:    0.0  Total:    0.0
+  TLB Flush  | Total:    0.0  RemoteShootdown:    0.0  LocalShootdown:    0.0
+             | LocalMM:    0.0  RemoteIPI:    0.0  TaskSwitch:    0.0
+
+=== Testing posix_spawn | 2 GB | 4KB regular pages ===
+  Allocated and touched 2048 MB (4KB regular pages)
+  Running 100 iterations...
+  Latency    | Mean:    0.131 ms  StdDev:    0.018 ms  P99:    0.254 ms
+  PageFaults | User:   49.0  Kernel:    2.8  Total:   51.9
+  TLB Flush  | Total:   14.6  RemoteShootdown:    0.0  LocalShootdown:    0.0
+             | LocalMM:   13.6  RemoteIPI:    0.0  TaskSwitch:    1.0
+
+=== Testing fork | 2 GB | 2MB huge pages ===
+  Allocated and touched 2048 MB (2MB huge pages)
+  Running 100 iterations...
+  Latency    | Mean:    1.089 ms  StdDev:    0.107 ms  P99:    1.307 ms
+  PageFaults | User:    8.0  Kernel:    1.0  Total:    9.0
+  TLB Flush  | Total:    8.2  RemoteShootdown:    0.0  LocalShootdown:    0.0
+             | LocalMM:    7.3  RemoteIPI:    0.0  TaskSwitch:    1.0
+
+=== Testing vfork | 2 GB | 2MB huge pages ===
+  Allocated and touched 2048 MB (2MB huge pages)
+  Running 100 iterations...
+  Latency    | Mean:    0.029 ms  StdDev:    0.007 ms  P99:    0.078 ms
+  PageFaults | User:    0.0  Kernel:    0.0  Total:    0.0
+  TLB Flush  | Total:    0.0  RemoteShootdown:    0.0  LocalShootdown:    0.0
+             | LocalMM:    0.0  RemoteIPI:    0.0  TaskSwitch:    0.0
+
+=== Testing posix_spawn | 2 GB | 2MB huge pages ===
+  Allocated and touched 2048 MB (2MB huge pages)
+  Running 100 iterations...
+  Latency    | Mean:    0.131 ms  StdDev:    0.013 ms  P99:    0.229 ms
+  PageFaults | User:   49.0  Kernel:    2.9  Total:   51.8
+  TLB Flush  | Total:   14.7  RemoteShootdown:    0.0  LocalShootdown:    0.0
+             | LocalMM:   13.7  RemoteIPI:    0.0  TaskSwitch:    1.0
+
+>>> CSV results saved.
+
+=== eBPF Metrics Legend ===
+  NOTE: all metrics are the SUM of parent + child PID events per
+        iteration, giving the true total cost of process creation.
+
+  PF_User          - User page faults (CoW copies triggered by writes).
+  PF_Kernel        - Kernel page faults (page table copy work in fork).
+  PF_Total         - Sum of both.
+  TLB_Total        - All TLB flush events combined.
+  TLB_RemoteShoot  - Remote TLB shootdowns (expensive cross-CPU stalls).
+  TLB_LocalShoot   - This CPU flushing its own TLB.
+  TLB_LocalMM      - Full address-space TLB flush.
+  TLB_RemoteIPI    - IPI sent requesting remote CPU TLB flush.
+  TLB_TaskSwitch   - Flush on context switch (background noise).
+
+=== Benchmark Complete ===
+Results saved to: results_20260219_043247/
