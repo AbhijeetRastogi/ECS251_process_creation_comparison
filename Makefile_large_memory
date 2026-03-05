@@ -1,0 +1,38 @@
+CC = gcc
+CFLAGS = -O2 -Wall -Wextra -std=c11
+LDFLAGS = -lm
+
+TARGET = benchmark_large_memory
+SOURCE = benchmark_large_memory.c
+
+.PHONY: all clean run setup check-memory help
+
+all: $(TARGET)
+
+$(TARGET): $(SOURCE)
+	$(CC) $(CFLAGS) -o $(TARGET) $(SOURCE) $(LDFLAGS)
+
+clean:
+	rm -f $(TARGET)
+	rm -rf results_large_*
+
+run: $(TARGET)
+	sudo ./$(TARGET)
+
+check-memory:
+	@free -h
+	@echo ""
+	@cat /proc/meminfo | grep -E "MemTotal|MemAvailable"
+
+setup:
+	echo always | sudo tee /sys/kernel/mm/transparent_hugepage/enabled
+	sudo swapoff -a || true
+	echo performance | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor 2>/dev/null || true
+	sync; echo 3 | sudo tee /proc/sys/vm/drop_caches
+
+help:
+	@echo "make            - Build"
+	@echo "make run        - Build and run"
+	@echo "make setup      - Configure system"
+	@echo "make check-memory - Check RAM"
+	@echo "make clean      - Clean"
