@@ -40,3 +40,5 @@ __pycache__/
 # OS generated files
 .Trash-*/
 Thumbs.db
+
+.venv/

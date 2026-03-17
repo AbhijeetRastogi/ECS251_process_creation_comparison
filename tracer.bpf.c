@@ -101,6 +101,20 @@ struct page_fault_args {
     unsigned long error_code; /* why the fault occurred (missing page, etc) */
 };
 
+/*
+ * Format: /sys/kernel/debug/tracing/events/sched/sched_process_fork/format
+ *
+ * The common 8-byte header is followed by parent_comm, parent_pid,
+ * child_comm, child_pid (matches the kernel tracepoint layout exactly).
+ */
+struct sched_process_fork_args {
+    __u64  pad;               /* 8-byte common tracepoint header              */
+    char   parent_comm[16];   /* offset 8  – parent task name (informational) */
+    __u32  parent_pid;        /* offset 24 – parent PID                       */
+    char   child_comm[16];    /* offset 28 – child task name  (informational) */
+    __u32  child_pid;         /* offset 44 – child PID                        */
+};
+
 /* Format: /sys/kernel/debug/tracing/events/tlb/tlb_flush/format */
 struct tlb_flush_args {
     __u16 common_type;
@@ -241,6 +255,43 @@ int trace_tlb_flush(struct tlb_flush_args *ctx) {
         default:
             break;
     }
+
+    return 0;
+}
+
+/*
+ * Fires in the kernel at the moment a new process is created via fork/vfork/
+ * clone — before the child has run a single instruction.
+ *
+ * Problem this solves (posix_spawn race):
+ *   posix_spawn() calls clone/vfork internally, then the child immediately
+ *   exec()s.  All the interesting events (page faults during exec, TLB
+ *   flushes) happen *inside* the child before userspace has a chance to call
+ *   tracer_watch_pid() for the child PID.  By the time the benchmark does
+ *   that, the child's work is already done and the events are lost.
+ *
+ *   By hooking sched_process_fork in the kernel we can add the child to
+ *   watched_pids atomically at birth — before it runs — so we never miss
+ *   an event.
+ */
+SEC("tracepoint/sched/sched_process_fork")
+int trace_sched_process_fork(struct sched_process_fork_args *ctx) {
+    __u32 parent_pid = ctx->parent_pid;
+    __u32 child_pid  = ctx->child_pid;
+
+    /* Only propagate when the parent is already being watched */
+    if (!is_watched(parent_pid))
+        return 0;
+
+    /* Add the child to the watch set so its events are captured from birth */
+    __u8 val = 1;
+    bpf_map_update_elem(&watched_pids, &child_pid, &val, BPF_ANY);
+
+    /* Pre-create a zeroed metrics entry for the child so the first atomic
+     * increment always hits an existing entry rather than racing with
+     * get_or_create_metrics() across CPUs. */
+    struct ebpf_metrics zero = {};
+    bpf_map_update_elem(&metrics_map, &child_pid, &zero, BPF_NOEXIST);
 
     return 0;
 }

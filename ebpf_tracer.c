@@ -40,12 +40,14 @@ struct tracer_ctx {
     struct bpf_program *prog_pf_user;    /* page_fault_user handler           */
     struct bpf_program *prog_pf_kernel;  /* page_fault_kernel handler         */
     struct bpf_program *prog_tlb;        /* tlb_flush handler                 */
+    struct bpf_program *prog_fork;       /* sched_process_fork handler        */
 
     /* BPF link handles - represent the attachment to a tracepoint.
      * Destroying a link detaches the program from the tracepoint. */
     struct bpf_link *link_pf_user;
     struct bpf_link *link_pf_kernel;
     struct bpf_link *link_tlb;
+    struct bpf_link *link_fork;
 
     /* File descriptors for the two BPF maps.
      * We use these to read/write map entries from userspace. */
@@ -147,8 +149,11 @@ tracer_ctx_t *tracer_init(const char *bpf_obj_path) {
                             ctx->obj, "trace_page_fault_kernel");
     ctx->prog_tlb = bpf_object__find_program_by_name(
                             ctx->obj, "trace_tlb_flush");
+    ctx->prog_fork = bpf_object__find_program_by_name(
+                            ctx->obj, "trace_sched_process_fork");
 
-    if (!ctx->prog_pf_user || !ctx->prog_pf_kernel || !ctx->prog_tlb) {
+    if (!ctx->prog_pf_user || !ctx->prog_pf_kernel ||
+        !ctx->prog_tlb     || !ctx->prog_fork) {
         fprintf(stderr, "[tracer] Failed to find BPF programs in object.\n"
                         "         Check function names in tracer.bpf.c.\n");
         bpf_object__close(ctx->obj);
@@ -188,6 +193,17 @@ tracer_ctx_t *tracer_init(const char *bpf_obj_path) {
         return NULL;
     }
 
+    ctx->link_fork = bpf_program__attach(ctx->prog_fork);
+    if (libbpf_get_error(ctx->link_fork)) {
+        fprintf(stderr, "[tracer] Failed to attach sched_process_fork probe.\n");
+        bpf_link__destroy(ctx->link_pf_user);
+        bpf_link__destroy(ctx->link_pf_kernel);
+        bpf_link__destroy(ctx->link_tlb);
+        bpf_object__close(ctx->obj);
+        free(ctx);
+        return NULL;
+    }
+
     /* ---- Step 5: Get file descriptors for the BPF maps ----
      * The names must match the map names in tracer.bpf.c. */
     struct bpf_map *metrics_map = bpf_object__find_map_by_name(
@@ -211,7 +227,7 @@ tracer_ctx_t *tracer_init(const char *bpf_obj_path) {
 
     fprintf(stderr, "[tracer] eBPF tracer initialized successfully.\n"
                     "         Attached to: page_fault_user, "
-                    "page_fault_kernel, tlb_flush\n");
+                    "page_fault_kernel, tlb_flush, sched_process_fork\n");
     return ctx;
 }
 
@@ -222,6 +238,7 @@ void tracer_cleanup(tracer_ctx_t *ctx) {
     if (ctx->link_pf_user)   bpf_link__destroy(ctx->link_pf_user);
     if (ctx->link_pf_kernel) bpf_link__destroy(ctx->link_pf_kernel);
     if (ctx->link_tlb)       bpf_link__destroy(ctx->link_tlb);
+    if (ctx->link_fork)      bpf_link__destroy(ctx->link_fork);
 
     /* Closing the object unloads the BPF programs and maps from the kernel */
     if (ctx->obj) bpf_object__close(ctx->obj);
@@ -254,6 +271,11 @@ int tracer_unwatch_pid(tracer_ctx_t *ctx, int pid) {
             return -1;
         }
     }
+    /* Also remove the metrics entry so the map doesn't fill up.
+     * With 100 iterations × 3 methods × N configs, stale child entries
+     * quickly exhaust the 1024-entry metrics_map, causing later configs
+     * to silently drop all events (get_or_create_metrics returns NULL). */
+    bpf_map_delete_elem(ctx->metrics_map_fd, &key);
     return 0;
 }
 
