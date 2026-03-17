@@ -497,6 +497,52 @@ int benchmark_fork(iteration_data_t *data, int iterations, int parent_pid) {
     return 0;
 }
 
+int benchmark_fork_cow(iteration_data_t *data, int iterations, int parent_pid,
+                       void *mem, size_t mem_bytes, size_t page_size) {
+    perf_fds_t pfds = perf_open();
+    if (!pfds.valid)
+        LOGF("  [perf] Hardware counters unavailable for this run.\n");
+
+    for (int i = 0; i < iterations; i++) {
+
+        if (g_tracer) tracer_reset_metrics(g_tracer, parent_pid);
+        perf_reset_and_enable(&pfds);
+
+        uint64_t start = get_time_ns();
+        pid_t child = fork();
+        if (child < 0) { perror("fork failed"); perf_close(&pfds); return -1; }
+
+        if (child == 0) {
+            /* Child: write one byte per page to trigger CoW faults.
+             * Each write forces the kernel to copy the shared page,
+             * giving us the true post-fork memory cost. */
+            volatile char *p = (volatile char *)mem;
+            for (size_t off = 0; off < mem_bytes; off += page_size)
+                p[off] = 2;
+            _exit(0);
+        }
+
+        /* Parent: wait for child to finish all CoW writes before stopping timer */
+        int status;
+        waitpid(child, &status, 0);
+        uint64_t end = get_time_ns();
+
+        perf_disable_and_read(&pfds, &data[i].perf);
+        data[i].latency_ns = end - start;
+
+        if (g_tracer) {
+            tracer_read_metrics(g_tracer, parent_pid, &data[i].ebpf);
+
+            struct ebpf_metrics child_m = {0};
+            tracer_read_metrics(g_tracer, child, &child_m);
+            merge_metrics(&data[i].ebpf, &child_m);
+            tracer_unwatch_pid(g_tracer, child);
+        }
+    }
+    perf_close(&pfds);
+    return 0;
+}
+
 int benchmark_vfork(iteration_data_t *data, int iterations, int parent_pid) {
     perf_fds_t pfds = perf_open();
 
@@ -618,8 +664,11 @@ int run_benchmark(size_t memory_gb, int use_huge_pages, const char *method,
 
     LOGF("  Running %d iterations...\n", NUM_ITERATIONS);
 
+    size_t page_size = use_huge_pages ? PAGE_SIZE_2MB : PAGE_SIZE_4KB;
+
     int ret = 0;
     if      (strcmp(method, "fork")        == 0) ret = benchmark_fork(data, NUM_ITERATIONS, my_pid);
+    else if (strcmp(method, "fork_cow")    == 0) ret = benchmark_fork_cow(data, NUM_ITERATIONS, my_pid, mem, memory_bytes, page_size);
     else if (strcmp(method, "vfork")       == 0) ret = benchmark_vfork(data, NUM_ITERATIONS, my_pid);
     else if (strcmp(method, "posix_spawn") == 0) ret = benchmark_posix_spawn(data, NUM_ITERATIONS, my_pid);
     else { fprintf(stderr, "Unknown method: %s\n", method); ret = -1; }
@@ -810,8 +859,9 @@ int main(int argc, char *argv[]) {
         LOGF("\n[INFO] eBPF not available. Running in timing-only mode.\n\n");
     }
 
-    const char *methods[] = {"fork", "vfork", "posix_spawn"};
-    int total_tests = NUM_MEMORY_SIZES * 2 * 3;  /* mem_sizes × page_types × methods */
+    const char *methods[] = {"fork", "fork_cow", "vfork", "posix_spawn"};
+    int num_methods = 4;
+    int total_tests = NUM_MEMORY_SIZES * 2 * num_methods;
 
     result_t *results = calloc(total_tests, sizeof(result_t));
     if (!results) {
@@ -826,7 +876,7 @@ int main(int argc, char *argv[]) {
     for (size_t mem_idx = 0; mem_idx < NUM_MEMORY_SIZES; mem_idx++) {
         size_t memory_gb = MEMORY_SIZES[mem_idx];
         for (int use_huge = 0; use_huge <= 1; use_huge++) {
-            for (int m = 0; m < 3; m++) {
+            for (int m = 0; m < num_methods; m++) {
                 if (run_benchmark(memory_gb, use_huge, methods[m],
                                   &results[result_idx]) == 0)
                     result_idx++;

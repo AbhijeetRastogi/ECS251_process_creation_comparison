@@ -39,6 +39,7 @@ import seaborn as sns
 # the reader can quickly identify fork/vfork/posix_spawn without reading labels
 METHOD_COLORS = {
     "fork":         "#E74C3C",   # red   — powerful but heavy
+    "fork_cow":     "#E67E22",   # orange — fork + full CoW writeback
     "vfork":        "#3498DB",   # blue  — fast but risky
     "posix_spawn":  "#2ECC71",   # green — safe and clean
 }
@@ -135,7 +136,13 @@ def method_legend(ax, methods):
 #   effect side by side.
 # =============================================================================
 
+def base_methods(df: pd.DataFrame) -> pd.DataFrame:
+    """Filter to the three core methods, excluding fork_cow."""
+    return df[df["Method"].isin(["fork", "vfork", "posix_spawn"])]
+
+
 def graph_mean_latency(df: pd.DataFrame, out_dir: str):
+    df = base_methods(df)
     memory_sizes = sorted(df["Memory_GB"].unique())
     n_panels = len(memory_sizes)
 
@@ -220,6 +227,7 @@ def graph_latency_boxplot(df: pd.DataFrame, out_dir: str):
     (we don't store raw iteration data in the CSV, only summary stats).
     We reconstruct a representative distribution using mean, stddev, min, max.
     """
+    df = base_methods(df)
     memory_sizes = sorted(df["Memory_GB"].unique())
     n_panels     = len(memory_sizes)
 
@@ -310,6 +318,7 @@ def graph_latency_boxplot(df: pd.DataFrame, out_dir: str):
 # =============================================================================
 
 def graph_hugepage_speedup(df: pd.DataFrame, out_dir: str):
+    df = base_methods(df)
     memory_sizes = sorted(df["Memory_GB"].unique())
     methods      = sorted(df["Method"].unique())
 
@@ -389,6 +398,7 @@ def graph_hugepage_speedup(df: pd.DataFrame, out_dir: str):
 # =============================================================================
 
 def graph_memory_scaling(df: pd.DataFrame, out_dir: str):
+    df = base_methods(df)
     page_sizes = sorted(df["Page_Size"].unique())
     methods    = sorted(df["Method"].unique())
 
@@ -456,6 +466,7 @@ def graph_memory_scaling(df: pd.DataFrame, out_dir: str):
 # =============================================================================
 
 def graph_page_faults(df: pd.DataFrame, out_dir: str):
+    df = base_methods(df)
     memory_sizes = sorted(df["Memory_GB"].unique())
     methods      = sorted(df["Method"].unique())
     page_sizes   = sorted(df["Page_Size"].unique())
@@ -518,6 +529,317 @@ def graph_page_faults(df: pd.DataFrame, out_dir: str):
 
 
 # =============================================================================
+# Graph 5b — CoW page fault scaling (fork vs fork_cow)
+#
+# PURPOSE:
+#   Compares page faults between plain fork (child exits immediately, ~12
+#   constant faults from syscall overhead) and fork_cow (child writes every
+#   page, triggering one CoW fault per page). fork_cow page faults should
+#   scale linearly with memory size, proving that the CoW mechanism is
+#   working and showing the true deferred cost of fork().
+# =============================================================================
+
+def graph_cow_scaling(df: pd.DataFrame, out_dir: str):
+    cow_df = df[df["Method"].isin(["fork", "fork_cow"])]
+    if cow_df.empty or "fork_cow" not in cow_df["Method"].values:
+        print("  [SKIP] No fork_cow data found — skipping CoW scaling graph.")
+        return None
+
+    page_sizes = sorted(cow_df["Page_Size"].unique())
+
+    fig, axes = plt.subplots(1, len(page_sizes),
+                             figsize=(7 * len(page_sizes), 5),
+                             sharey=False)
+    if len(page_sizes) == 1:
+        axes = [axes]
+
+    fig.suptitle("CoW Page Fault Scaling: fork (no write) vs fork_cow (child writes every page)\n"
+                 "fork_cow faults should scale linearly with memory — fork stays flat",
+                 fontsize=13, fontweight="bold", y=1.04)
+
+    for ax, ps in zip(axes, page_sizes):
+        sub = cow_df[cow_df["Page_Size"] == ps]
+
+        for method in ["fork", "fork_cow"]:
+            mdf = sub[sub["Method"] == method].sort_values("Memory_GB")
+            if mdf.empty:
+                continue
+            x = mdf["Memory_GB"].values
+            y = mdf["PF_Total"].values
+            color = METHOD_COLORS.get(method, "#888888")
+
+            ax.plot(x, y, marker="o", linewidth=2, color=color, label=method)
+
+            # Annotate each point
+            for xi, yi in zip(x, y):
+                ax.annotate(f"{yi:,.0f}",
+                            (xi, yi), textcoords="offset points",
+                            xytext=(0, 10), ha="center", fontsize=8,
+                            color=color)
+
+        ax.set_title(f"Page Size: {PAGE_LABELS.get(ps, ps)}", fontsize=12)
+        ax.set_xlabel("Parent Memory Size (GB)")
+        ax.set_ylabel("Total Page Faults Per Iteration (eBPF)")
+        ax.set_xticks(sorted(sub["Memory_GB"].unique()))
+        ax.set_xticklabels([f"{m} GB" for m in sorted(sub["Memory_GB"].unique())])
+        ax.legend(title="Method", framealpha=0.7)
+        ax.set_yscale("log")
+        ax.annotate("fork_cow = child writes 1 byte per page after fork,\n"
+                    "triggering a full CoW copy of every shared page.",
+                    xy=(0.02, 0.98), xycoords="axes fraction",
+                    ha="left", va="top", fontsize=8, color="grey",
+                    bbox=dict(boxstyle="round,pad=0.3", fc="white", alpha=0.7))
+
+    plt.tight_layout()
+    path = os.path.join(out_dir, "09_cow_scaling.png")
+    plt.savefig(path)
+    plt.close()
+    print(f"  Saved: {path}")
+    return path
+
+
+# =============================================================================
+# Graph 10 — fork vs fork_cow latency comparison
+#
+# PURPOSE:
+#   Side-by-side bar chart showing the "setup" cost (fork) versus the
+#   "setup + full CoW writeback" cost (fork_cow). The gap between the two
+#   bars is the hidden deferred cost that CoW conceals.
+# =============================================================================
+
+def graph_cow_latency_comparison(df: pd.DataFrame, out_dir: str):
+    cow_df = df[df["Method"].isin(["fork", "fork_cow"])]
+    if cow_df.empty or "fork_cow" not in cow_df["Method"].values:
+        return None
+
+    page_sizes   = sorted(cow_df["Page_Size"].unique())
+    memory_sizes = sorted(cow_df["Memory_GB"].unique())
+
+    fig, axes = plt.subplots(1, len(page_sizes),
+                             figsize=(7 * len(page_sizes), 5),
+                             sharey=False)
+    if len(page_sizes) == 1:
+        axes = [axes]
+
+    fig.suptitle("fork() Setup Cost vs Full CoW Writeback Cost\n"
+                 "(gap between bars = hidden deferred memory copy cost)",
+                 fontsize=13, fontweight="bold", y=1.04)
+
+    for ax, ps in zip(axes, page_sizes):
+        sub = cow_df[cow_df["Page_Size"] == ps]
+        x   = np.arange(len(memory_sizes))
+        bar_w = 0.35
+
+        for i, method in enumerate(["fork", "fork_cow"]):
+            mdf = sub[sub["Method"] == method].sort_values("Memory_GB")
+            if mdf.empty:
+                continue
+            vals = mdf["Mean_ms"].values
+            errs = mdf["StdDev_ms"].values
+            color = METHOD_COLORS.get(method, "#888888")
+            offset = -bar_w / 2 if i == 0 else bar_w / 2
+            bars = ax.bar(x + offset, vals, bar_w, yerr=errs, capsize=4,
+                          color=color, alpha=0.9, label=method)
+            for bar, val in zip(bars, vals):
+                ax.text(bar.get_x() + bar.get_width() / 2,
+                        bar.get_height() + max(errs) * 0.1,
+                        f"{val:.1f}", ha="center", va="bottom", fontsize=8)
+
+        # Draw arrows showing the deferred cost gap
+        fork_vals = sub[sub["Method"] == "fork"].sort_values("Memory_GB")["Mean_ms"].values
+        cow_vals  = sub[sub["Method"] == "fork_cow"].sort_values("Memory_GB")["Mean_ms"].values
+        if len(fork_vals) == len(cow_vals):
+            for xi, (fv, cv) in enumerate(zip(fork_vals, cow_vals)):
+                if cv > fv:
+                    ax.annotate("", xy=(xi + bar_w / 2, cv * 0.95),
+                                xytext=(xi - bar_w / 2, fv * 1.05),
+                                arrowprops=dict(arrowstyle="->", color="#555",
+                                                lw=1.5, ls="--"))
+                    mid = (fv + cv) / 2
+                    ax.text(xi + bar_w * 0.8, mid,
+                            f"+{cv - fv:.1f} ms\nCoW cost",
+                            fontsize=7, color="#555", ha="left", va="center")
+
+        ax.set_title(f"Page Size: {PAGE_LABELS.get(ps, ps)}", fontsize=12)
+        ax.set_xlabel("Parent Memory Size (GB)")
+        ax.set_ylabel("Mean Latency (ms)")
+        ax.set_xticks(x)
+        ax.set_xticklabels([f"{m} GB" for m in memory_sizes])
+        ax.legend(title="Method", framealpha=0.7)
+
+    plt.tight_layout()
+    path = os.path.join(out_dir, "10_cow_latency_comparison.png")
+    plt.savefig(path)
+    plt.close()
+    print(f"  Saved: {path}")
+    return path
+
+
+# =============================================================================
+# Graph 11 — CoW cost breakdown (stacked: setup vs deferred)
+#
+# PURPOSE:
+#   Decomposes fork_cow latency into two parts:
+#     1. Setup cost = fork() latency (page table copy, no writes)
+#     2. CoW cost   = fork_cow - fork (the deferred copy triggered by writes)
+#   Shows what percentage of total work is hidden behind CoW.
+# =============================================================================
+
+def graph_cow_cost_breakdown(df: pd.DataFrame, out_dir: str):
+    fork_df = df[df["Method"] == "fork"]
+    cow_df  = df[df["Method"] == "fork_cow"]
+    if fork_df.empty or cow_df.empty:
+        return None
+
+    page_sizes   = sorted(df["Page_Size"].unique())
+    memory_sizes = sorted(df["Memory_GB"].unique())
+
+    fig, axes = plt.subplots(1, len(page_sizes),
+                             figsize=(7 * len(page_sizes), 5),
+                             sharey=False)
+    if len(page_sizes) == 1:
+        axes = [axes]
+
+    fig.suptitle("fork_cow Latency Breakdown: Setup (page table copy) vs CoW (deferred page copies)\n"
+                 "Shows what fraction of the real cost is hidden behind Copy-on-Write",
+                 fontsize=12, fontweight="bold", y=1.04)
+
+    for ax, ps in zip(axes, page_sizes):
+        f_sub = fork_df[fork_df["Page_Size"] == ps].sort_values("Memory_GB")
+        c_sub = cow_df[cow_df["Page_Size"] == ps].sort_values("Memory_GB")
+
+        if f_sub.empty or c_sub.empty:
+            ax.text(0.5, 0.5, "No data", ha="center", va="center",
+                    transform=ax.transAxes)
+            continue
+
+        mems = f_sub["Memory_GB"].values
+        setup_cost = f_sub["Mean_ms"].values
+        total_cost = c_sub["Mean_ms"].values
+        cow_cost   = np.maximum(total_cost - setup_cost, 0)
+
+        x = np.arange(len(mems))
+        bar_w = 0.5
+
+        ax.bar(x, setup_cost, bar_w, color="#E74C3C", alpha=0.9,
+               label="Setup (fork page table copy)")
+        ax.bar(x, cow_cost, bar_w, bottom=setup_cost,
+               color="#E67E22", alpha=0.9,
+               label="CoW (deferred page copies)")
+
+        # Percentage labels
+        for xi, (sc, cc, tc) in enumerate(zip(setup_cost, cow_cost, total_cost)):
+            if tc > 0:
+                pct = cc / tc * 100
+                ax.text(xi, tc + tc * 0.02,
+                        f"{tc:.1f} ms\n({pct:.0f}% CoW)",
+                        ha="center", va="bottom", fontsize=8)
+
+        ax.set_title(f"Page Size: {PAGE_LABELS.get(ps, ps)}", fontsize=12)
+        ax.set_xlabel("Parent Memory Size (GB)")
+        ax.set_ylabel("Mean Latency (ms)")
+        ax.set_xticks(x)
+        ax.set_xticklabels([f"{m} GB" for m in mems])
+        ax.legend(fontsize=9, loc="upper left")
+
+    plt.tight_layout()
+    path = os.path.join(out_dir, "11_cow_cost_breakdown.png")
+    plt.savefig(path)
+    plt.close()
+    print(f"  Saved: {path}")
+    return path
+
+
+# =============================================================================
+# Graph 12 — fork_cow huge page speedup
+#
+# PURPOSE:
+#   With CoW, huge pages should show a dramatic speedup since there are
+#   512× fewer pages to copy (each 2MB instead of 4KB). This graph
+#   isolates that comparison: fork_cow with 4KB vs 2MB at each memory size.
+# =============================================================================
+
+def graph_cow_hugepage_benefit(df: pd.DataFrame, out_dir: str):
+    cow_df = df[df["Method"] == "fork_cow"]
+    if cow_df.empty:
+        return None
+
+    memory_sizes = sorted(cow_df["Memory_GB"].unique())
+    has_both = all(
+        len(cow_df[(cow_df["Memory_GB"] == m) & (cow_df["Page_Size"] == "4KB")]) > 0 and
+        len(cow_df[(cow_df["Memory_GB"] == m) & (cow_df["Page_Size"] == "2MB")]) > 0
+        for m in memory_sizes
+    )
+    if not has_both:
+        return None
+
+    fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+
+    fig.suptitle("fork_cow: Huge Page Benefit for CoW-Heavy Workloads",
+                 fontsize=13, fontweight="bold", y=1.02)
+
+    # Left panel: latency comparison
+    ax = axes[0]
+    x = np.arange(len(memory_sizes))
+    bar_w = 0.35
+
+    for i, ps in enumerate(["4KB", "2MB"]):
+        sub = cow_df[cow_df["Page_Size"] == ps].sort_values("Memory_GB")
+        vals = sub["Mean_ms"].values
+        errs = sub["StdDev_ms"].values
+        color = "#E74C3C" if ps == "4KB" else "#3498DB"
+        offset = -bar_w / 2 if i == 0 else bar_w / 2
+        bars = ax.bar(x + offset, vals, bar_w, yerr=errs, capsize=4,
+                      color=color, alpha=0.85, label=f"{ps} pages")
+        for bar, val in zip(bars, vals):
+            ax.text(bar.get_x() + bar.get_width() / 2,
+                    bar.get_height() + max(errs) * 0.1,
+                    f"{val:.0f}", ha="center", va="bottom", fontsize=8)
+
+    ax.set_title("Latency: 4KB vs 2MB pages", fontsize=12)
+    ax.set_xlabel("Parent Memory Size (GB)")
+    ax.set_ylabel("fork_cow Mean Latency (ms)")
+    ax.set_xticks(x)
+    ax.set_xticklabels([f"{m} GB" for m in memory_sizes])
+    ax.legend(framealpha=0.7)
+
+    # Right panel: speedup ratio
+    ax = axes[1]
+    ratios = []
+    for m in memory_sizes:
+        v4 = cow_df[(cow_df["Memory_GB"] == m) & (cow_df["Page_Size"] == "4KB")]["Mean_ms"].values[0]
+        v2 = cow_df[(cow_df["Memory_GB"] == m) & (cow_df["Page_Size"] == "2MB")]["Mean_ms"].values[0]
+        ratios.append(v4 / v2 if v2 > 0 else 0)
+
+    bars = ax.bar(x, ratios, 0.5, color="#E67E22", alpha=0.9)
+    ax.axhline(1.0, color="black", linewidth=1.0, linestyle="--", alpha=0.5)
+
+    for bar, ratio in zip(bars, ratios):
+        ax.text(bar.get_x() + bar.get_width() / 2,
+                bar.get_height() + 0.05,
+                f"{ratio:.1f}×", ha="center", va="bottom",
+                fontsize=10, fontweight="bold")
+
+    ax.set_title("Huge Page Speedup (4KB ÷ 2MB latency)", fontsize=12)
+    ax.set_xlabel("Parent Memory Size (GB)")
+    ax.set_ylabel("Speedup Ratio")
+    ax.set_xticks(x)
+    ax.set_xticklabels([f"{m} GB" for m in memory_sizes])
+    ax.annotate("Huge pages reduce CoW copies: 512× fewer pages to copy\n"
+                "→ proportionally fewer page faults and TLB flushes.",
+                xy=(0.02, 0.98), xycoords="axes fraction",
+                ha="left", va="top", fontsize=8, color="grey",
+                bbox=dict(boxstyle="round,pad=0.3", fc="white", alpha=0.7))
+
+    plt.tight_layout()
+    path = os.path.join(out_dir, "12_cow_hugepage_benefit.png")
+    plt.savefig(path)
+    plt.close()
+    print(f"  Saved: {path}")
+    return path
+
+
+# =============================================================================
 # Graph 6 — TLB shootdown breakdown (eBPF)
 #
 # PURPOSE:
@@ -529,6 +851,7 @@ def graph_page_faults(df: pd.DataFrame, out_dir: str):
 # =============================================================================
 
 def graph_tlb_breakdown(df: pd.DataFrame, out_dir: str):
+    df = base_methods(df)
     memory_sizes = sorted(df["Memory_GB"].unique())
     page_sizes   = sorted(df["Page_Size"].unique())
 
@@ -609,6 +932,7 @@ def graph_tlb_breakdown(df: pd.DataFrame, out_dir: str):
 # =============================================================================
 
 def graph_correlation_heatmap(df: pd.DataFrame, out_dir: str):
+    df = base_methods(df)
     numeric_cols = [
         "Mean_ms", "P99_ms",
         "PF_Kernel", "PF_User",
@@ -677,6 +1001,7 @@ def graph_correlation_heatmap(df: pd.DataFrame, out_dir: str):
 # =============================================================================
 
 def graph_summary_table(df: pd.DataFrame, out_dir: str, has_ebpf: bool):
+    # Summary table includes ALL methods (including fork_cow)
     display_cols = ["Memory_GB", "Page_Size", "Method",
                     "Mean_ms", "StdDev_ms", "P99_ms"]
     if has_ebpf:
@@ -779,6 +1104,19 @@ def write_summary(df: pd.DataFrame, has_ebpf: bool,
                                       "strongly predict latency.",
         "08_summary_table.png":      "Full results in table form. All configurations "
                                      "side by side — useful for reports or slides.",
+        "09_cow_scaling.png":        "(eBPF) CoW page fault scaling: fork (child exits) "
+                                     "vs fork_cow (child writes every page). Shows that "
+                                     "fork's true deferred memory cost scales linearly "
+                                     "with parent memory size.",
+        "10_cow_latency_comparison.png": "fork vs fork_cow latency side by side. The gap "
+                                         "between bars is the hidden deferred cost that "
+                                         "CoW conceals. Arrows show the delta.",
+        "11_cow_cost_breakdown.png": "Stacked bar decomposing fork_cow into setup cost "
+                                     "(page table copy) and CoW cost (deferred page "
+                                     "copies). Shows what % of total work is hidden.",
+        "12_cow_hugepage_benefit.png": "fork_cow with 4KB vs 2MB pages. Huge pages should "
+                                       "show dramatic speedup since there are 512x fewer "
+                                       "pages to CoW-copy.",
     }
 
     for g in saved_graphs:
@@ -816,6 +1154,19 @@ def write_summary(df: pd.DataFrame, has_ebpf: bool,
                          f"{speedup:.1f}× on average.")
 
         if has_ebpf:
+            # fork_cow CoW scaling finding
+            cow_max = df[(df["Method"] == "fork_cow") &
+                         (df["Page_Size"] == "4KB")]
+            fork_plain = df[(df["Method"] == "fork") &
+                            (df["Page_Size"] == "4KB")]
+            if not cow_max.empty and not fork_plain.empty:
+                cow_pf = cow_max.sort_values("Memory_GB", ascending=False).iloc[0]
+                fork_pf = fork_plain.sort_values("Memory_GB", ascending=False).iloc[0]
+                lines.append(
+                    f"  - fork_cow at {cow_pf['Memory_GB']:.0f} GB / 4KB: "
+                    f"{cow_pf['PF_Total']:,.0f} page faults vs fork's "
+                    f"{fork_pf['PF_Total']:.0f} (child writes trigger CoW).")
+
             fork_tlb = df[(df["Method"] == "fork") &
                           (df["Page_Size"] == "4KB")]["TLB_RemoteShootdown"].mean()
             vfork_tlb = df[(df["Method"] == "vfork") &
@@ -829,9 +1180,10 @@ def write_summary(df: pd.DataFrame, has_ebpf: bool,
     lines.append("")
     lines.append("HOW TO READ THE GRAPHS")
     lines.append("-" * 40)
-    lines.append("  Red   = fork()")
-    lines.append("  Blue  = vfork()")
-    lines.append("  Green = posix_spawn()")
+    lines.append("  Red    = fork()")
+    lines.append("  Orange = fork_cow()  (fork + child writes every page)")
+    lines.append("  Blue   = vfork()")
+    lines.append("  Green  = posix_spawn()")
     lines.append("")
     lines.append("  Error bars / shaded bands = ±1 standard deviation")
     lines.append("  P99 = worst time experienced by 1% of iterations")
@@ -875,40 +1227,68 @@ def main():
     # ---- Generate all graphs ----
     saved = []
 
-    print("[1/8] Mean latency bar chart...")
+    # --- Core 3-method graphs (fork, vfork, posix_spawn) ---
+    print("--- Core Method Comparison (fork / vfork / posix_spawn) ---")
+
+    print("[01/12] Mean latency bar chart...")
     p = graph_mean_latency(df, out_dir)
     if p: saved.append(p)
 
-    print("[2/8] Latency distribution plot...")
+    print("[02/12] Latency distribution plot...")
     p = graph_latency_boxplot(df, out_dir)
     if p: saved.append(p)
 
-    print("[3/8] Huge page speedup ratio...")
+    print("[03/12] Huge page speedup ratio...")
     p = graph_hugepage_speedup(df, out_dir)
     if p: saved.append(p)
 
-    print("[4/8] Memory scaling line chart...")
+    print("[04/12] Memory scaling line chart...")
     p = graph_memory_scaling(df, out_dir)
     if p: saved.append(p)
 
     if has_ebpf:
-        print("[5/8] Page fault comparison (eBPF)...")
+        print("[05/12] Page fault comparison (eBPF)...")
         p = graph_page_faults(df, out_dir)
         if p: saved.append(p)
 
-        print("[6/8] TLB breakdown (eBPF)...")
+        print("[06/12] TLB breakdown (eBPF)...")
         p = graph_tlb_breakdown(df, out_dir)
         if p: saved.append(p)
 
-        print("[7/8] Correlation heatmap (eBPF)...")
+        print("[07/12] Correlation heatmap (eBPF)...")
         p = graph_correlation_heatmap(df, out_dir)
         if p: saved.append(p)
     else:
-        print("[5-7/8] Skipping eBPF graphs (no eBPF data in CSV).")
+        print("[05-07/12] Skipping eBPF graphs (no eBPF data in CSV).")
 
-    print("[8/8] Summary table...")
+    print("[08/12] Summary table (all methods)...")
     p = graph_summary_table(df, out_dir, has_ebpf)
     if p: saved.append(p)
+
+    # --- fork_cow dedicated analysis graphs ---
+    has_cow = "fork_cow" in df["Method"].values
+    if has_cow and has_ebpf:
+        print("\n--- fork_cow CoW Analysis ---")
+
+        print("[09/12] CoW page fault scaling (fork vs fork_cow)...")
+        p = graph_cow_scaling(df, out_dir)
+        if p: saved.append(p)
+
+        print("[10/12] fork vs fork_cow latency comparison...")
+        p = graph_cow_latency_comparison(df, out_dir)
+        if p: saved.append(p)
+
+        print("[11/12] CoW cost breakdown (setup vs deferred)...")
+        p = graph_cow_cost_breakdown(df, out_dir)
+        if p: saved.append(p)
+
+        print("[12/12] fork_cow huge page benefit...")
+        p = graph_cow_hugepage_benefit(df, out_dir)
+        if p: saved.append(p)
+    elif has_cow:
+        print("\n[09-12/12] Skipping fork_cow graphs (no eBPF data).")
+    else:
+        print("\n[09-12/12] Skipping fork_cow graphs (no fork_cow data in CSV).")
 
     # ---- Write summary ----
     print("\n[INFO] Writing summary.txt...")

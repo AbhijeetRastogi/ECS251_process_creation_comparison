@@ -1,0 +1,79 @@
+BENCHMARK VISUALIZATION SUMMARY
+============================================================
+Generated : 2026-03-16 18:49:31
+Source CSV: /home/lava/Projects/ECS251_process_creation_comparison/results_20260316_182440/results.csv
+Output dir: /home/lava/Projects/ECS251_process_creation_comparison/graphs_20260316_184927
+eBPF data : Yes
+
+GRAPHS GENERATED
+----------------------------------------
+  01_mean_latency.png
+    Mean latency grouped bar chart. Headline comparison
+    of all three methods.
+
+  02_latency_distribution.png
+    Distribution plot showing mean, std dev, P99, min,
+    and max for each configuration.
+
+  03_hugepage_speedup.png
+    Speedup ratio chart showing how much faster 2MB huge
+    pages are vs 4KB regular pages.
+
+  04_memory_scaling.png
+    Line chart showing how latency grows as parent
+    memory doubles. fork scales linearly;
+    vfork/posix_spawn stay flat.
+
+  05_page_faults.png
+    (eBPF) Kernel and user page faults per iteration.
+    Quantifies the CoW copy work triggered by fork.
+
+  06_tlb_breakdown.png
+    (eBPF) TLB flush events broken down by type. Remote
+    shootdowns are the key multi-core cost of fork.
+
+  07_correlation_heatmap.png
+    (eBPF) Correlation matrix between latency and kernel
+    events. Shows which events most strongly predict
+    latency.
+
+  08_summary_table.png
+    Full results in table form. All configurations side
+    by side — useful for reports or slides.
+
+  09_cow_scaling.png
+    (eBPF) CoW page fault scaling: fork (child exits) vs
+    fork_cow (child writes every page). Shows that
+    fork's true deferred memory cost scales linearly
+    with parent memory size.
+
+  10_cow_latency_comparison.png
+    fork vs fork_cow latency side by side. The gap
+    between bars is the hidden deferred cost that CoW
+    conceals. Arrows show the delta.
+
+  11_cow_cost_breakdown.png
+    Stacked bar decomposing fork_cow into setup cost
+    (page table copy) and CoW cost (deferred page
+    copies). Shows what % of total work is hidden.
+
+  12_cow_hugepage_benefit.png
+    fork_cow with 4KB vs 2MB pages. Huge pages should
+    show dramatic speedup since there are 512x fewer
+    pages to CoW-copy.
+
+KEY FINDINGS (from data)
+----------------------------------------
+  - fork() is 210× slower than vfork() at 1 GB with 4KB pages.
+  - Huge pages reduce fork() latency by 20.9× on average.
+  - fork_cow at 8 GB / 4KB: 1,006,360 page faults vs fork's 13 (child writes trigger CoW).
+
+HOW TO READ THE GRAPHS
+----------------------------------------
+  Red    = fork()
+  Orange = fork_cow()  (fork + child writes every page)
+  Blue   = vfork()
+  Green  = posix_spawn()
+
+  Error bars / shaded bands = ±1 standard deviation
+  P99 = worst time experienced by 1% of iterations
