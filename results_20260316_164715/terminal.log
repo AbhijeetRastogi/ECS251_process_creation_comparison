@@ -1,0 +1,271 @@
+Process Creation Benchmark with eBPF Kernel Tracing
+=====================================================
+Output directory : results_20260316_164715/
+Log file         : results_20260316_164715/terminal.log
+CSV file         : results_20260316_164715/results.csv
+Iterations per configuration: 100
+Available system memory : ~8 GB
+Memory sizes configured : 1GB(OK) 2GB(OK) 4GB(OK) 8GB(SKIP) 16GB(SKIP)
+
+=== Testing fork | 1 GB | 4KB regular pages ===
+  Allocated and touched 1024 MB (4KB regular pages)
+  Running 100 iterations...
+  Latency    | Mean:    0.332 ms  StdDev:    0.074 ms  P99:    0.561 ms
+  PageFaults | User:   10.0  Kernel:    2.1  Total:   12.1
+  TLB Flush  | Total:    9.3  RemoteShootdown:    0.0  LocalShootdown:    0.0
+             | LocalMM:    8.0  RemoteIPI:    0.3  TaskSwitch:    1.0
+  HW Counters| Cycles:    1597738  Insns:    1645220  CPI: 0.97
+             | CacheRefs:    69748  CacheMisses:    32616  MissRate: 46.8%
+             | BranchMisses:   3964  SW_PageFaults:     44
+
+=== Testing vfork | 1 GB | 4KB regular pages ===
+  Allocated and touched 1024 MB (4KB regular pages)
+  Running 100 iterations...
+  Latency    | Mean:    0.032 ms  StdDev:    0.010 ms  P99:    0.091 ms
+  PageFaults | User:    0.0  Kernel:    0.0  Total:    0.0
+  TLB Flush  | Total:    0.0  RemoteShootdown:    0.0  LocalShootdown:    0.0
+             | LocalMM:    0.0  RemoteIPI:    0.0  TaskSwitch:    0.0
+  HW Counters| Cycles:     537141  Insns:     676646  CPI: 0.79
+             | CacheRefs:    21819  CacheMisses:     4207  MissRate: 19.3%
+             | BranchMisses:   1930  SW_PageFaults:      0
+
+=== Testing posix_spawn | 1 GB | 4KB regular pages ===
+  Allocated and touched 1024 MB (4KB regular pages)
+  Running 100 iterations...
+  Latency    | Mean:    0.118 ms  StdDev:    0.049 ms  P99:    0.347 ms
+  PageFaults | User:   50.0  Kernel:    2.9  Total:   52.9
+  TLB Flush  | Total:   17.8  RemoteShootdown:    0.0  LocalShootdown:    0.0
+             | LocalMM:   13.0  RemoteIPI:    2.6  TaskSwitch:    2.2
+  HW Counters| Cycles:   10364274  Insns:    8777910  CPI: 1.18
+             | CacheRefs:   320949  CacheMisses:    76257  MissRate: 23.8%
+             | BranchMisses:  45682  SW_PageFaults:     93
+
+=== Testing fork | 1 GB | 2MB huge pages ===
+  Allocated and touched 1024 MB (2MB huge pages)
+  Running 100 iterations...
+  Latency    | Mean:    0.363 ms  StdDev:    0.112 ms  P99:    0.896 ms
+  PageFaults | User:   10.0  Kernel:    2.0  Total:   12.1
+  TLB Flush  | Total:    9.7  RemoteShootdown:    0.0  LocalShootdown:    0.0
+             | LocalMM:    8.1  RemoteIPI:    0.7  TaskSwitch:    1.0
+  HW Counters| Cycles:    1654630  Insns:    1537930  CPI: 1.08
+             | CacheRefs:    61595  CacheMisses:    31526  MissRate: 51.2%
+             | BranchMisses:   2733  SW_PageFaults:     51
+
+=== Testing vfork | 1 GB | 2MB huge pages ===
+  Allocated and touched 1024 MB (2MB huge pages)
+  Running 100 iterations...
+  Latency    | Mean:    0.030 ms  StdDev:    0.013 ms  P99:    0.102 ms
+  PageFaults | User:    0.0  Kernel:    0.0  Total:    0.0
+  TLB Flush  | Total:    0.0  RemoteShootdown:    0.0  LocalShootdown:    0.0
+             | LocalMM:    0.0  RemoteIPI:    0.0  TaskSwitch:    0.0
+  HW Counters| Cycles:     531246  Insns:     606312  CPI: 0.88
+             | CacheRefs:    18778  CacheMisses:     3197  MissRate: 17.0%
+             | BranchMisses:   2434  SW_PageFaults:      0
+
+=== Testing posix_spawn | 1 GB | 2MB huge pages ===
+  Allocated and touched 1024 MB (2MB huge pages)
+  Running 100 iterations...
+  Latency    | Mean:    0.139 ms  StdDev:    0.082 ms  P99:    0.495 ms
+  PageFaults | User:   50.1  Kernel:    2.9  Total:   53.1
+  TLB Flush  | Total:   17.3  RemoteShootdown:    0.0  LocalShootdown:    0.0
+             | LocalMM:   13.0  RemoteIPI:    2.2  TaskSwitch:    2.1
+  HW Counters| Cycles:   11435349  Insns:   10196576  CPI: 1.12
+             | CacheRefs:   385800  CacheMisses:    68334  MissRate: 17.7%
+             | BranchMisses:  57988  SW_PageFaults:    191
+
+=== Testing fork | 2 GB | 4KB regular pages ===
+  Allocated and touched 2048 MB (4KB regular pages)
+  Running 100 iterations...
+  Latency    | Mean:    0.560 ms  StdDev:    0.126 ms  P99:    0.994 ms
+  PageFaults | User:   10.0  Kernel:    2.1  Total:   12.1
+  TLB Flush  | Total:    9.5  RemoteShootdown:    0.0  LocalShootdown:    0.0
+             | LocalMM:    8.0  RemoteIPI:    0.5  TaskSwitch:    1.0
+  HW Counters| Cycles:    2763340  Insns:    3036262  CPI: 0.91
+             | CacheRefs:   123090  CacheMisses:    51162  MissRate: 41.6%
+             | BranchMisses:   3966  SW_PageFaults:     47
+
+=== Testing vfork | 2 GB | 4KB regular pages ===
+  Allocated and touched 2048 MB (4KB regular pages)
+  Running 100 iterations...
+  Latency    | Mean:    0.028 ms  StdDev:    0.010 ms  P99:    0.081 ms
+  PageFaults | User:    0.0  Kernel:    0.0  Total:    0.0
+  TLB Flush  | Total:    0.0  RemoteShootdown:    0.0  LocalShootdown:    0.0
+             | LocalMM:    0.0  RemoteIPI:    0.0  TaskSwitch:    0.0
+  HW Counters| Cycles:     522533  Insns:     591196  CPI: 0.88
+             | CacheRefs:    20504  CacheMisses:     3203  MissRate: 15.6%
+             | BranchMisses:   2082  SW_PageFaults:      0
+
+=== Testing posix_spawn | 2 GB | 4KB regular pages ===
+  Allocated and touched 2048 MB (4KB regular pages)
+  Running 100 iterations...
+  Latency    | Mean:    0.133 ms  StdDev:    0.074 ms  P99:    0.498 ms
+  PageFaults | User:   49.9  Kernel:    2.9  Total:   52.8
+  TLB Flush  | Total:   17.6  RemoteShootdown:    0.0  LocalShootdown:    0.0
+             | LocalMM:   13.0  RemoteIPI:    2.5  TaskSwitch:    2.1
+  HW Counters| Cycles:   11546350  Insns:   10002775  CPI: 1.15
+             | CacheRefs:   397081  CacheMisses:    66711  MissRate: 16.8%
+             | BranchMisses:  54870  SW_PageFaults:    174
+
+=== Testing fork | 2 GB | 2MB huge pages ===
+  Allocated and touched 2048 MB (2MB huge pages)
+  Running 100 iterations...
+  Latency    | Mean:    0.585 ms  StdDev:    0.132 ms  P99:    0.910 ms
+  PageFaults | User:   10.0  Kernel:    2.1  Total:   12.1
+  TLB Flush  | Total:    9.4  RemoteShootdown:    0.0  LocalShootdown:    0.0
+             | LocalMM:    8.0  RemoteIPI:    0.4  TaskSwitch:    1.0
+  HW Counters| Cycles:    2796641  Insns:    2759701  CPI: 1.01
+             | CacheRefs:   115012  CacheMisses:    51378  MissRate: 44.7%
+             | BranchMisses:   2839  SW_PageFaults:     51
+
+=== Testing vfork | 2 GB | 2MB huge pages ===
+  Allocated and touched 2048 MB (2MB huge pages)
+  Running 100 iterations...
+  Latency    | Mean:    0.029 ms  StdDev:    0.030 ms  P99:    0.251 ms
+  PageFaults | User:    0.0  Kernel:    0.0  Total:    0.0
+  TLB Flush  | Total:    0.0  RemoteShootdown:    0.0  LocalShootdown:    0.0
+             | LocalMM:    0.0  RemoteIPI:    0.0  TaskSwitch:    0.0
+  HW Counters| Cycles:     630732  Insns:     609704  CPI: 1.03
+             | CacheRefs:    21831  CacheMisses:     3484  MissRate: 16.0%
+             | BranchMisses:   1955  SW_PageFaults:      0
+
+=== Testing posix_spawn | 2 GB | 2MB huge pages ===
+  Allocated and touched 2048 MB (2MB huge pages)
+  Running 100 iterations...
+  Latency    | Mean:    0.133 ms  StdDev:    0.089 ms  P99:    0.570 ms
+  PageFaults | User:   50.0  Kernel:    2.9  Total:   52.9
+  TLB Flush  | Total:   17.8  RemoteShootdown:    0.0  LocalShootdown:    0.0
+             | LocalMM:   13.0  RemoteIPI:    2.6  TaskSwitch:    2.2
+  HW Counters| Cycles:   12008800  Insns:   10666460  CPI: 1.13
+             | CacheRefs:   393407  CacheMisses:    79312  MissRate: 20.2%
+             | BranchMisses:  55649  SW_PageFaults:    229
+
+=== Testing fork | 4 GB | 4KB regular pages ===
+  Allocated and touched 4096 MB (4KB regular pages)
+  Running 100 iterations...
+  Latency    | Mean:    2.788 ms  StdDev:    0.544 ms  P99:    6.114 ms
+  PageFaults | User:   10.0  Kernel:    2.3  Total:   12.4
+  TLB Flush  | Total:   10.9  RemoteShootdown:    0.3  LocalShootdown:    0.0
+             | LocalMM:    8.0  RemoteIPI:    0.3  TaskSwitch:    2.2
+  HW Counters| Cycles:   12806081  Insns:   18239913  CPI: 0.70
+             | CacheRefs:   480809  CacheMisses:   209329  MissRate: 43.5%
+             | BranchMisses:   4277  SW_PageFaults:     33
+
+=== Testing vfork | 4 GB | 4KB regular pages ===
+  Allocated and touched 4096 MB (4KB regular pages)
+  Running 100 iterations...
+  Latency    | Mean:    0.034 ms  StdDev:    0.037 ms  P99:    0.374 ms
+  PageFaults | User:    0.0  Kernel:    0.0  Total:    0.0
+  TLB Flush  | Total:    0.0  RemoteShootdown:    0.0  LocalShootdown:    0.0
+             | LocalMM:    0.0  RemoteIPI:    0.0  TaskSwitch:    0.0
+  HW Counters| Cycles:     588624  Insns:     613383  CPI: 0.96
+             | CacheRefs:    23552  CacheMisses:     3688  MissRate: 15.7%
+             | BranchMisses:   3200  SW_PageFaults:      0
+
+=== Testing posix_spawn | 4 GB | 4KB regular pages ===
+  Allocated and touched 4096 MB (4KB regular pages)
+  Running 100 iterations...
+  Latency    | Mean:    0.115 ms  StdDev:    0.061 ms  P99:    0.424 ms
+  PageFaults | User:   50.0  Kernel:    3.0  Total:   53.0
+  TLB Flush  | Total:   16.6  RemoteShootdown:    0.0  LocalShootdown:    0.0
+             | LocalMM:   13.0  RemoteIPI:    1.5  TaskSwitch:    2.0
+  HW Counters| Cycles:    9249444  Insns:    8824609  CPI: 1.05
+             | CacheRefs:   291829  CacheMisses:    44672  MissRate: 15.3%
+             | BranchMisses:  49289  SW_PageFaults:    109
+
+=== Testing fork | 4 GB | 2MB huge pages ===
+  Allocated and touched 4096 MB (2MB huge pages)
+  Running 100 iterations...
+  Latency    | Mean:    1.228 ms  StdDev:    0.284 ms  P99:    1.950 ms
+  PageFaults | User:   10.0  Kernel:    2.0  Total:   12.1
+  TLB Flush  | Total:   10.5  RemoteShootdown:    0.0  LocalShootdown:    0.0
+             | LocalMM:    8.0  RemoteIPI:    1.4  TaskSwitch:    1.0
+  HW Counters| Cycles:    5241140  Insns:    5604824  CPI: 0.94
+             | CacheRefs:   197237  CacheMisses:    87636  MissRate: 44.4%
+             | BranchMisses:   3941  SW_PageFaults:     42
+
+=== Testing vfork | 4 GB | 2MB huge pages ===
+  Allocated and touched 4096 MB (2MB huge pages)
+  Running 100 iterations...
+  Latency    | Mean:    0.030 ms  StdDev:    0.025 ms  P99:    0.249 ms
+  PageFaults | User:    0.0  Kernel:    0.0  Total:    0.0
+  TLB Flush  | Total:    0.0  RemoteShootdown:    0.0  LocalShootdown:    0.0
+             | LocalMM:    0.0  RemoteIPI:    0.0  TaskSwitch:    0.0
+  HW Counters| Cycles:     589060  Insns:     612663  CPI: 0.96
+             | CacheRefs:    22870  CacheMisses:     3369  MissRate: 14.7%
+             | BranchMisses:   3496  SW_PageFaults:      0
+
+=== Testing posix_spawn | 4 GB | 2MB huge pages ===
+  Allocated and touched 4096 MB (2MB huge pages)
+  Running 100 iterations...
+  Latency    | Mean:    0.142 ms  StdDev:    0.074 ms  P99:    0.404 ms
+  PageFaults | User:   49.9  Kernel:    2.9  Total:   52.9
+  TLB Flush  | Total:   17.0  RemoteShootdown:    0.0  LocalShootdown:    0.0
+             | LocalMM:   13.0  RemoteIPI:    2.0  TaskSwitch:    2.1
+  HW Counters| Cycles:   13208363  Insns:   11409186  CPI: 1.16
+             | CacheRefs:   405156  CacheMisses:    72311  MissRate: 17.8%
+             | BranchMisses:  69265  SW_PageFaults:    268
+
+[SKIP] 8 GB > 80% of available memory (8 GB free). Skipping fork/4KB.
+Benchmark failed for fork 8GB 4KB, continuing...
+
+[SKIP] 8 GB > 80% of available memory (8 GB free). Skipping vfork/4KB.
+Benchmark failed for vfork 8GB 4KB, continuing...
+
+[SKIP] 8 GB > 80% of available memory (8 GB free). Skipping posix_spawn/4KB.
+Benchmark failed for posix_spawn 8GB 4KB, continuing...
+
+[SKIP] 8 GB > 80% of available memory (8 GB free). Skipping fork/2MB.
+Benchmark failed for fork 8GB 2MB, continuing...
+
+[SKIP] 8 GB > 80% of available memory (8 GB free). Skipping vfork/2MB.
+Benchmark failed for vfork 8GB 2MB, continuing...
+
+[SKIP] 8 GB > 80% of available memory (8 GB free). Skipping posix_spawn/2MB.
+Benchmark failed for posix_spawn 8GB 2MB, continuing...
+
+[SKIP] 16 GB > 80% of available memory (8 GB free). Skipping fork/4KB.
+Benchmark failed for fork 16GB 4KB, continuing...
+
+[SKIP] 16 GB > 80% of available memory (8 GB free). Skipping vfork/4KB.
+Benchmark failed for vfork 16GB 4KB, continuing...
+
+[SKIP] 16 GB > 80% of available memory (8 GB free). Skipping posix_spawn/4KB.
+Benchmark failed for posix_spawn 16GB 4KB, continuing...
+
+[SKIP] 16 GB > 80% of available memory (8 GB free). Skipping fork/2MB.
+Benchmark failed for fork 16GB 2MB, continuing...
+
+[SKIP] 16 GB > 80% of available memory (8 GB free). Skipping vfork/2MB.
+Benchmark failed for vfork 16GB 2MB, continuing...
+
+[SKIP] 16 GB > 80% of available memory (8 GB free). Skipping posix_spawn/2MB.
+Benchmark failed for posix_spawn 16GB 2MB, continuing...
+
+>>> CSV results saved.
+
+=== eBPF Metrics Legend ===
+  NOTE: all metrics are the SUM of parent + child PID events per
+        iteration, giving the true total cost of process creation.
+
+  PF_User          - User page faults (CoW copies triggered by writes).
+  PF_Kernel        - Kernel page faults (page table copy work in fork).
+  PF_Total         - Sum of both.
+  TLB_Total        - All TLB flush events combined.
+  TLB_RemoteShoot  - Remote TLB shootdowns (expensive cross-CPU stalls).
+  TLB_LocalShoot   - This CPU flushing its own TLB.
+  TLB_LocalMM      - Full address-space TLB flush.
+  TLB_RemoteIPI    - IPI sent requesting remote CPU TLB flush.
+  TLB_TaskSwitch   - Flush on context switch (background noise).
+
+=== perf Hardware Counter Legend ===
+  HW_Cycles        - CPU clock cycles consumed by the syscall.
+  HW_Instructions  - Retired instructions (Cycles/Instructions = CPI).
+  HW_CacheRefs     - Last-level cache (LLC) accesses.
+  HW_CacheMisses   - LLC misses (MissRate = Misses/Refs * 100).
+  HW_BranchMisses  - Mispredicted branches (pipeline flush overhead).
+  SW_PageFaults    - Software page-fault event (cross-checks eBPF count).
+  Note: HW counters require root or CAP_PERFMON. SW_PageFaults works
+        without root on most kernels (perf_event_paranoid <= 2).
+
+=== Benchmark Complete ===
+Results saved to: results_20260316_164715/
