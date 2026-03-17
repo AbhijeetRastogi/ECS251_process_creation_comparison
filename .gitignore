@@ -5,12 +5,12 @@ quick_test
 *.out
 *.exe
 
-# Results and data files
-results_*/
-*.csv
-*.txt
-*.dat
-*.log
+# # Results and data files
+# results_*/
+# *.csv
+# *.txt
+# *.dat
+# *.log
 
 # Temporary files
 *.swp

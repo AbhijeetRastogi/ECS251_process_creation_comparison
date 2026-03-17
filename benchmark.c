@@ -283,14 +283,15 @@ static size_t get_free_memory_gb(void) {
 /*
  * memory_size_is_safe() - return 1 if we can safely allocate size_gb.
  *
- * We require 80% headroom: allocating more than 80% of available memory
+ * We require 90% headroom: allocating more than 90% of available memory
  * risks triggering the OOM killer mid-benchmark, which would corrupt results.
- * A 20% buffer accommodates kernel overhead and other processes.
+ * A 10% buffer (~1 GB on a 16 GB machine) accommodates kernel overhead
+ * and other processes during the short-lived benchmark allocations.
  */
 static int memory_size_is_safe(size_t size_gb) {
     size_t free_gb = get_free_memory_gb();
     if (free_gb == 0) return 1;   /* couldn't read — let it try and fail gracefully */
-    return (size_gb * 10) <= (free_gb * 8);   /* size_gb <= free_gb * 0.8 */
+    return (size_gb * 10) <= (free_gb * 9);   /* size_gb <= free_gb * 0.9 */
 }
 
 /* -------------------------------------------------------------------------
@@ -595,7 +596,7 @@ int run_benchmark(size_t memory_gb, int use_huge_pages, const char *method,
      * smaller machines — the benchmark degrades gracefully instead of OOM. */
     if (!memory_size_is_safe(memory_gb)) {
         size_t free_gb = get_free_memory_gb();
-        LOGF("\n[SKIP] %zu GB > 80%% of available memory (%zu GB free). "
+        LOGF("\n[SKIP] %zu GB > 90%% of available memory (%zu GB free). "
              "Skipping %s/%s.\n",
              memory_gb, free_gb, method,
              use_huge_pages ? "2MB" : "4KB");
